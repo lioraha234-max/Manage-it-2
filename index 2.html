@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage It</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1A1B2E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Manage It">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Suez+One&family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1A1B2E; --surface:#232544; --surface-2:#2C2F55;
+    --lime:#C4F135; --coral:#FF6F61; --sky:#5AC8FA; --gold:#F5D76E; --violet:#B08BFF;
+    --text:#F5F5F7; --muted:#9092B5; --line:#34365C; --row-h:13px;
+  }
+  html[data-theme="light"]{
+    --bg:#F4F5FA; --surface:#FFFFFF; --surface-2:#EEF0F8;
+    --text:#1A1B2E; --muted:#6B6E8C; --line:#DDE0EE;
+  }
+  html[data-theme="light"] .task-block, html[data-theme="light"] .chip.selected,
+  html[data-theme="light"] .day-tab.active, html[data-theme="light"] button.submit,
+  html[data-theme="light"] .check.done{ color:#1A1B2E; }
+  body{ transition: background .25s ease, color .25s ease; }
+
+  #loadingOverlay{ position:fixed; inset:0; background:var(--bg); z-index:100;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; transition: opacity .3s ease; }
+  .spinner{ width:34px; height:34px; border-radius:50%; border:3px solid var(--surface-2); border-top-color:var(--lime);
+    animation: spin .8s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  #loadingOverlay .load-label{ font-family:'Suez One',serif; color:var(--muted); font-size:14px; }
+
+  @keyframes fadeInUp{ from{ opacity:0; transform: translateY(6px); } to{ opacity:1; transform: translateY(0); } }
+  .task-item, .task-block{ animation: fadeInUp .28s ease; }
+  @keyframes pulseLine{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  .now-line{ animation: pulseLine 2s ease-in-out infinite; }
+
+  .theme-toggle{ background: var(--surface-2); border:1px solid var(--line); color:var(--text); border-radius:999px;
+    width:38px; height:38px; font-size:16px; cursor:pointer; flex-shrink:0; }
+  .theme-toggle:active{ transform: scale(0.9); }
+
+  .streak-badge{ display:inline-flex; align-items:center; gap:6px; background: var(--surface-2);
+    border:1px solid var(--line); border-radius:999px; padding:7px 14px; font-size:13px; margin: 4px 20px 4px; }
+  .streak-badge strong{ color: var(--gold); font-family:'Suez One',serif; }
+
+  .stat-row{ margin-bottom:10px; }
+  .stat-row-top{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; }
+  .stat-row-top .cnt{ color: var(--muted); }
+  .stat-bar-bg{ height:8px; border-radius:999px; background: var(--surface-2); overflow:hidden; }
+  .stat-bar-fill{ height:100%; border-radius:999px; transition: width .5s ease; }
+
+  .onboard-dots{ display:flex; gap:6px; justify-content:center; margin-top:16px; }
+  .onboard-dot{ width:7px; height:7px; border-radius:50%; background: var(--line); }
+  .onboard-dot.active{ background: var(--lime); width:18px; border-radius:4px; transition: all .2s ease; }
+  .onboard-nav{ display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+  .onboard-emoji{ font-size:40px; margin-bottom:10px; text-align:center; }
+
+  .empty{ color: var(--muted); font-size:13px; text-align:center; padding:28px 0; }
+  .empty .empty-emoji{ font-size:34px; display:block; margin-bottom:8px; }
+
+  .summary-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .summary-row:last-child{ border-bottom:none; }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background: var(--bg); color: var(--text); font-family:'Heebo',sans-serif; min-height:100vh; padding-bottom:40px; }
+  header{ padding: 26px 20px 16px; position: relative; overflow:hidden; display:flex; justify-content:space-between; align-items:flex-start; }
+  header::after{ content:""; position:absolute; inset-inline-start:-40px; top:-60px; width:180px; height:180px; border-radius:50%;
+    background: radial-gradient(circle, rgba(196,241,53,0.18), transparent 70%); }
+  h1{ font-family:'Suez One',serif; font-size:32px; letter-spacing:.5px; }
+  header p{ color: var(--muted); margin-top:4px; font-size:13.5px; max-width: 240px; }
+  .lang-toggle{ background: var(--surface-2); border:1px solid var(--line); color:var(--text); border-radius:999px;
+    padding:8px 14px; font-size:13px; cursor:pointer; font-family:'Heebo'; font-weight:700; z-index:2; flex-shrink:0; }
+  .lang-toggle:active{ transform: scale(0.95); }
+  select.lang-toggle{ appearance:none; -webkit-appearance:none; padding-inline-end:26px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%; background-size:5px 5px, 5px 5px; background-repeat:no-repeat; }
+
+  .toolbar-row{ display:flex; gap:10px; margin: 0 20px 6px; }
+  .toolbar-row button{ flex:1; }
+
+  .modal-overlay{ position:fixed; inset:0; background:rgba(10,10,20,.7); z-index:50;
+    display:none; align-items:center; justify-content:center; padding:24px; }
+  .modal-card{ background: var(--surface); border-radius:20px; padding:22px; max-width:360px; width:100%;
+    position:relative; }
+  .modal-card h2{ font-family:'Suez One',serif; font-size:22px; margin-bottom:12px; font-weight:normal; color:var(--lime); }
+  .modal-card p{ font-size:14px; line-height:1.7; color: var(--text); margin-bottom:10px; }
+  .modal-close{ position:absolute; top:14px; inset-inline-end:14px; background:none; border:none; color:var(--muted);
+    font-size:18px; cursor:pointer; }
+
+  .card{ margin: 14px 20px; background: var(--surface); border-radius: 18px; padding: 16px; }
+  .card h2{ font-size: 14px; color: var(--muted); font-weight:500; margin-bottom: 12px; }
+
+  .settings-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .settings-row .field{ flex:1; min-width: 110px; }
+  .field label{ display:block; font-size:11.5px; color: var(--muted); margin-bottom:4px; }
+  input[type=text], input[type=time], input[type=number]{
+    width:100%; background: var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; color: var(--text); font-family:'Heebo'; font-size:14.5px;
+  }
+  input:focus{ outline: 2px solid var(--lime); }
+
+  .field{ margin-bottom: 10px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ padding:7px 12px; border-radius:999px; background: var(--surface-2); border:1px solid var(--line);
+    color: var(--muted); font-size:13px; cursor:pointer; user-select:none; }
+  .chip.selected{ background: var(--lime); color:#1A1B2E; border-color:var(--lime); font-weight:700; }
+  .cat-chip{ display:flex; align-items:center; gap:6px; }
+  .cat-dot{ width:9px; height:9px; border-radius:50%; }
+  .toggle-row{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .toggle-row input{ width:auto; }
+  .toggle-row label{ font-size:13px; color: var(--text); }
+
+  button.submit{ margin-top:4px; width:100%; padding:13px; border:none; border-radius:12px;
+    background: var(--lime); color:#1A1B2E; font-weight:700; font-size:15px; cursor:pointer; font-family:'Heebo'; }
+  button.submit:active{ transform: scale(0.98); }
+  button.secondary{ background: var(--surface-2); color: var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:9px 14px; font-size:13px; cursor:pointer; font-family:'Heebo'; }
+
+  .suggest-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .suggest-chip{ background: var(--surface-2); border:1px dashed var(--line); border-radius:14px;
+    padding:9px 12px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .suggest-chip:active{ transform: scale(0.97); }
+  .suggest-chip .plus{ color: var(--lime); font-weight:700; }
+
+  .round-btn{ width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .round-btn:active{ transform: scale(0.92); }
+
+  .day-tabs{ display:flex; gap:8px; margin: 16px 20px 0; overflow-x:auto; padding-bottom:4px; }
+  .day-tab{ flex-shrink:0; padding:8px 16px; border-radius:999px; background: var(--surface-2);
+    color: var(--muted); font-size:13px; cursor:pointer; white-space:nowrap; }
+  .day-tab.active{ background: var(--lime); color:#1A1B2E; font-weight:700; }
+
+  .rail-section{ margin: 16px 20px; }
+  .rail-section h2{ font-size:14px; color: var(--muted); font-weight:500; margin-bottom:10px; }
+  .rail-outer{ background: var(--surface); border-radius:18px; padding:14px 4px 14px 10px; position:relative; }
+  .rail-grid{ display:grid; grid-template-columns: 1fr 46px; position:relative; }
+  .hour-label{ grid-column:2; font-size:10.5px; color: var(--muted); text-align:center; padding-top:2px; border-top:1px solid var(--line); }
+  .task-block{ grid-column:1; border-radius:8px; padding:3px 9px; font-size:11.5px; display:flex; align-items:center;
+    overflow:hidden; margin-inline-end:2px; color:#1A1B2E; font-weight:600; }
+  .task-block.done{ opacity:.35; text-decoration: line-through; }
+  .task-block.overflow{ outline: 2px dashed var(--coral); }
+  .now-line{ position:absolute; inset-inline-start:0; inset-inline-end:46px; height:2px; background: var(--coral); z-index:5; }
+  .now-line::after{ position:absolute; inset-inline-end:0; top:-16px; font-size:10px; color: var(--coral);
+    background: var(--surface); padding:0 4px; border-radius:4px; content: attr(data-label); }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+  .legend-item{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+  .legend-dot{ width:8px; height:8px; border-radius:50%; }
+
+  .list-section{ margin: 20px 20px; }
+  .list-section h2{ font-size:14px; color: var(--muted); font-weight:500; margin-bottom:10px; }
+  .task-item{ display:flex; align-items:center; gap:10px; background: var(--surface); border-radius:14px;
+    padding:12px 14px; margin-bottom:8px; }
+  .task-dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .task-item .info{ flex:1; min-width:0; }
+  .task-item .title{ font-size:14px; font-weight:500; }
+  .task-item .title.done{ text-decoration: line-through; color: var(--muted); }
+  .task-item .meta{ font-size:11px; color: var(--muted); margin-top:2px; }
+  .task-item .meta.overflow{ color: var(--coral); }
+  .task-item button{ background:none; border:none; color: var(--muted); font-size:16px; cursor:pointer; padding:4px 8px; }
+  .task-item .check{ width:22px; height:22px; border-radius:6px; border:2px solid var(--line); flex-shrink:0;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .task-item .check.done{ background: var(--lime); border-color: var(--lime); color:#1A1B2E; }
+  .empty{ color: var(--muted); font-size:13px; text-align:center; padding:20px 0; }
+  .reset-link{ display:block; text-align:center; color: var(--muted); font-size:12px; margin:18px 20px 0;
+    text-decoration: underline; cursor:pointer; background:none; border:none; }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="load-label">Manage It</div>
+</div>
+
+<header>
+  <div>
+    <h1>Manage It</h1>
+    <p data-i18n="tagline"></p>
+  </div>
+  <div style="display:flex; gap:8px; align-items:flex-start;">
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+    <select class="lang-toggle" id="langSelect">
+      <option value="en">English</option>
+      <option value="he">עברית</option>
+      <option value="es">Español</option>
+      <option value="fr">Français</option>
+      <option value="de">Deutsch</option>
+      <option value="it">Italiano</option>
+      <option value="pt">Português</option>
+      <option value="ru">Русский</option>
+      <option value="ar">العربية</option>
+      <option value="zh">中文</option>
+      <option value="ja">日本語</option>
+      <option value="hi">हिन्दी</option>
+    </select>
+  </div>
+</header>
+
+<div id="streakBadge" class="streak-badge" style="display:none;"></div>
+
+<div class="toolbar-row">
+  <button class="secondary" id="shareBtn"></button>
+  <button class="secondary" id="aboutBtn"></button>
+</div>
+<div class="toolbar-row">
+  <button class="secondary" id="summaryBtn"></button>
+  <button class="secondary" id="notifyBtn"></button>
+</div>
+
+<div class="modal-overlay" id="summaryOverlay">
+  <div class="modal-card">
+    <button class="modal-close" id="summaryClose">✕</button>
+    <h2 data-i18n="summaryTitle"></h2>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="onboardOverlay">
+  <div class="modal-card">
+    <div class="onboard-emoji" id="onboardEmoji"></div>
+    <h2 id="onboardTitle"></h2>
+    <p id="onboardBody"></p>
+    <div class="onboard-dots" id="onboardDots"></div>
+    <div class="onboard-nav">
+      <button class="secondary" id="onboardSkip"></button>
+      <button class="submit" id="onboardNext" style="width:auto; padding:10px 20px;"></button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="aboutOverlay">
+  <div class="modal-card">
+    <button class="modal-close" id="aboutClose">✕</button>
+    <h2 data-i18n="aboutTitle"></h2>
+    <p data-i18n="aboutBody1"></p>
+    <p data-i18n="aboutBody2"></p>
+  </div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="settingsTitle"></h2>
+  <div class="settings-row">
+    <div class="field">
+      <label data-i18n="dayStart" for="dayStartInput"></label>
+      <input type="time" id="dayStartInput" value="07:00">
+    </div>
+    <div class="field">
+      <label data-i18n="dayEnd" for="dayEndInput"></label>
+      <input type="time" id="dayEndInput" value="23:00">
+    </div>
+    <div class="field">
+      <label data-i18n="numDays" for="numDaysInput"></label>
+      <input type="number" id="numDaysInput" value="1" min="1" max="7">
+    </div>
+  </div>
+  <div class="field">
+    <label data-i18n="bedtime" for="bedtimeInput"></label>
+    <input type="time" id="bedtimeInput" value="22:30">
+  </div>
+</div>
+
+<div class="card" id="statsCard">
+  <h2 data-i18n="statsTitle"></h2>
+  <div id="statsContent"></div>
+</div>
+
+<div class="card">
+  <h2 data-i18n="taskCardTitle"></h2>
+  <div class="field">
+    <label data-i18n="taskLabel" for="titleInput"></label>
+    <input type="text" id="titleInput" maxlength="40">
+  </div>
+  <div class="field">
+    <label data-i18n="categoryLabel"></label>
+    <div class="chips" id="catChips"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="dayLabel"></label>
+    <div class="chips" id="dayChips"></div>
+  </div>
+  <div class="field">
+    <label data-i18n="durationLabel"></label>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="number" id="durationHoursInput" min="0" max="23" step="1" value="0" style="width:70px;">
+      <span id="durHoursLabelText" style="font-size:12.5px;color:var(--muted);"></span>
+      <input type="number" id="durationMinInput" min="0" max="59" step="1" value="30" style="width:70px;">
+      <span id="durMinLabelText" style="font-size:12.5px;color:var(--muted);"></span>
+    </div>
+    <div class="chips" id="durationChips" style="margin-top:8px;"></div>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="fixedTimeToggle">
+    <label data-i18n="fixedToggle" for="fixedTimeToggle"></label>
+  </div>
+  <div class="field" id="fixedTimeField" style="display:none">
+    <label data-i18n="fixedTimeLabel" for="fixedTimeInput"></label>
+    <input type="time" id="fixedTimeInput">
+  </div>
+  <button class="submit" id="addBtn" data-i18n="addBtn"></button>
+</div>
+
+<div class="card">
+  <h2 data-i18n="suggestTitle"></h2>
+  <div class="suggest-chips" id="suggestChips"></div>
+  <button class="secondary" id="refreshSuggestBtn" data-i18n="refreshSuggest"></button>
+</div>
+
+<div class="card">
+  <h2 data-i18n="templatesTitle"></h2>
+  <div class="chips" id="templateChips"></div>
+  <div id="templateEmpty" class="empty" style="display:none; padding:6px 0;"></div>
+  <button class="secondary" id="saveTemplateBtn" style="width:100%; margin-top:8px;"></button>
+</div>
+
+<div class="day-tabs" id="dayTabs"></div>
+
+<div class="rail-section">
+  <h2 id="railTitle"></h2>
+  <div class="rail-outer"><div class="rail-grid" id="railGrid"></div></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div class="list-section">
+  <h2 data-i18n="tasksTitle"></h2>
+  <div id="taskList"></div>
+</div>
+
+<button class="reset-link" id="resetBtn" data-i18n="resetLink"></button>
+
+<script>
+const STORAGE_KEY = 'manageit-v1';
+let tasks = [];
+let templates = [];
+let completions = {}; // { taskId: { date: 'YYYY-M-D', category } }
+let settings = { dayStart: 7*60, dayEnd: 23*60, numDays: 1, bedtime: 22*60+30, lang: 'en', theme: 'dark' };
+let selectedDuration = 30;
+let selectedCategory = 'study';
+let selectedDay = 0;
+let activeTab = 0;
+let seqCounter = 0;
+
+const DURATIONS = [15,30,45,60,90,120];
+const CAT_IDS = ['study','hobby','food','sleep','other'];
+const CAT_COLORS = {study:'#5AC8FA', hobby:'#C4F135', food:'#F5D76E', sleep:'#B08BFF', other:'#FF6F61'};
+const SUGGESTION_IDS = ['walk','noscreen','water','stretch','tidy','friend','read','planTomorrow','mealNoScreen','outside','breathe','sleepgo'];
+const SUGGESTION_META = {
+  walk:{d:20,cat:'hobby'}, noscreen:{d:10,cat:'other'}, water:{d:5,cat:'food'}, stretch:{d:10,cat:'hobby'},
+  tidy:{d:15,cat:'other'}, friend:{d:45,cat:'hobby'}, read:{d:20,cat:'hobby'}, planTomorrow:{d:10,cat:'other'},
+  mealNoScreen:{d:20,cat:'food'}, outside:{d:10,cat:'hobby'}, breathe:{d:5,cat:'other'}, sleepgo:{d:30,cat:'sleep',fixed:true}
+};
+
+const STR = {
+  he: {
+    tagline: 'תגיד מה יש לך לעשות — Manage It בונה לך את הסדר יום',
+    settingsTitle: 'הגדרות היום שלי',
+    dayStart: 'שעת התחלה', dayEnd: 'שעת סיום', numDays: 'לכמה ימים לתכנן?', bedtime: 'יעד שעת שינה',
+    taskCardTitle: 'מה יש לך לעשות?', taskLabel: 'המשימה', taskPlaceholder: 'לדוגמה: שיעורי בית במתמטיקה',
+    categoryLabel: 'קטגוריה', dayLabel: 'לאיזה יום?', todayChip: 'היום', dayChip: n=>`יום ${n}`,
+    durationLabel: 'משך זמן', durHoursLabel: 'שעות', durMinLabel: 'דקות',
+    durLabels: {15:"15 דק'", 30:"30 דק'", 45:"45 דק'", 60:'שעה', 90:'שעה וחצי', 120:'שעתיים'},
+    fixedToggle: 'יש לי שעה מסוימת שזה חייב לקרות בה', fixedTimeLabel: 'שעה מדויקת', addBtn: 'להוסיף למסלול',
+    suggestTitle: 'רעיונות לתוספת ליום ✦', refreshSuggest: 'רעיונות אחרים',
+    railTitle: (d,s,e) => `ציר ${d} (${s}–${e})`,
+    tasksTitle: 'המשימות שלי', emptyDay: 'אין עדיין משימות ליום הזה. תוסיף למעלה ⬆',
+    overflowNote: ' · אין מקום ביום — כדאי לבדוק', resetLink: 'להתחיל מחדש (מוחק הכל)',
+    resetConfirm: 'למחוק את כל המשימות ולהתחיל מחדש?', now: 'עכשיו', minutesWord: "דק'",
+    templatesTitle: 'תבניות יום', saveTemplateBtn: 'לשמור את היום המוצג כתבנית',
+    noTemplates: 'עוד אין תבניות שמורות. תבנה יום ותשמור אותו כתבנית ⬆',
+    templatePromptName: 'איך לקרוא לתבנית?', templateEmptyDay: 'אין משימות ביום המוצג לשמור',
+    templateApplyConfirm: name => `להחליף את המשימות של היום הנבחר בתבנית "${name}"?`,
+    templateDeleteConfirm: name => `למחוק את התבנית "${name}"?`,
+    shareBtn: '🔗 שתף עם חבר', shareCopied: '✓ הועתק!',
+    aboutBtn: 'ℹ️ אודות',
+    aboutTitle: 'מה זה Manage It?',
+    aboutBody1: 'Manage It עוזר לך לתכנן את היום שלך - משימות, לימודים, תחביבים, תזונה ושינה - במקום אחד. כותבים מה יש לכם לעשות וכמה זמן זה לוקח, והאתר בונה לכם סדר יום אוטומטית.',
+    aboutBody2: 'הכל נשמר רק בדפדפן שלכם - בלי חשבון, בלי מעקב. אפשר להתקין את זה על מסך הבית ולהשתמש כמו באפליקציה רגילה.',
+    streakLabel: n => n===0 ? 'עדיין אין רצף - סמן משימה כדי להתחיל' : `${n} ${n===1?'יום':'ימים'} ברצף 🔥`,
+    statsTitle: 'השבוע שלי', statsEmpty: 'עוד לא סימנת משימות כבוצעו השבוע',
+    summaryBtn: '📋 סיכום היום', summaryTitle: 'סיכום היום',
+    summaryDone: n=>`הושלמו: ${n}`, summaryLeft: n=>`נותרו: ${n}`, summaryNone: 'אין משימות ל"היום" עדיין',
+    notifyBtnOn: '🔔 תזכורות דלוקות', notifyBtnOff: '🔔 להפעיל תזכורות',
+    notifyDenied: 'ההרשאה נחסמה בדפדפן - אפשר לשנות בהגדרות האתר',
+    notifyLimitNote: '(עובד רק כשהאתר פתוח)',
+    onboardSkip: 'דלג', onboardNext: 'הבא', onboardStart: 'בואו נתחיל',
+    onboardSteps: [
+      {emoji:'👋', title:'ברוכים הבאים ל-Manage It', body:'תגיד לנו מה יש לך לעשות וכמה זמן זה לוקח - אנחנו נבנה לך את סדר היום.'},
+      {emoji:'🗂️', title:'הכל מסודר בקטגוריות', body:'לימודים, תחביבים, תזונה, שינה - כל משימה מקבלת צבע, כדי שתראה בקלות איך מתחלק לך היום.'},
+      {emoji:'🔥', title:'תתמיד ותראה תוצאות', body:'סמן משימות כבוצעו כדי לבנות רצף ולראות סטטיסטיקה שבועית. מוכנים?'}
+    ],
+    categories: {study:'לימודים', hobby:'תחביבים', food:'תזונה', sleep:'שינה', other:'אחר'},
+    suggestions: {walk:'הליכה קצרה בחוץ', noscreen:'לשבת רגע בלי מסך', water:'לשתות כוס מים גדולה', stretch:'מתיחות / תנועה',
+      tidy:'לסדר את החדר', friend:'לצאת עם חבר/ה', read:'לקרוא ספר', planTomorrow:'לתכנן את מחר',
+      mealNoScreen:'ארוחה בלי מסך', outside:'לצאת לחצר / מרפסת', breathe:'לנשום עמוק 5 דקות', sleepgo:'ללכת לישון'}
+  },
+  en: {
+    tagline: 'Tell it what you need to do — Manage It builds your schedule',
+    settingsTitle: 'My day settings',
+    dayStart: 'Start time', dayEnd: 'End time', numDays: 'Plan for how many days?', bedtime: 'Bedtime goal',
+    taskCardTitle: 'What do you need to do?', taskLabel: 'Task', taskPlaceholder: 'e.g. Math homework',
+    categoryLabel: 'Category', dayLabel: 'Which day?', todayChip: 'Today', dayChip: n=>`Day ${n}`,
+    durationLabel: 'Duration', durHoursLabel: 'hours', durMinLabel: 'min',
+    durLabels: {15:'15 min', 30:'30 min', 45:'45 min', 60:'1 hour', 90:'1.5 hours', 120:'2 hours'},
+    fixedToggle: 'This has to happen at a specific time', fixedTimeLabel: 'Exact time', addBtn: 'Add to my day',
+    suggestTitle: 'Ideas to add to your day ✦', refreshSuggest: 'More ideas',
+    railTitle: (d,s,e) => `${d} timeline (${s}–${e})`,
+    tasksTitle: 'My tasks', emptyDay: 'No tasks for this day yet. Add one above ⬆',
+    overflowNote: ' · No room today — worth checking', resetLink: 'Start over (deletes everything)',
+    resetConfirm: 'Delete all tasks and start over?', now: 'Now', minutesWord: 'min',
+    templatesTitle: 'Day templates', saveTemplateBtn: 'Save the day shown as a template',
+    noTemplates: 'No saved templates yet. Build a day and save it as a template ⬆',
+    templatePromptName: 'What should this template be called?', templateEmptyDay: 'No tasks in the day shown to save',
+    templateApplyConfirm: name => `Replace the selected day's tasks with the "${name}" template?`,
+    templateDeleteConfirm: name => `Delete the "${name}" template?`,
+    shareBtn: '🔗 Share with a friend', shareCopied: '✓ Copied!',
+    aboutBtn: 'ℹ️ About',
+    aboutTitle: 'What is Manage It?',
+    aboutBody1: 'Manage It helps you plan your day - tasks, school, hobbies, food, and sleep - all in one place. You write down what you need to do and how long it takes, and the site builds your schedule automatically.',
+    aboutBody2: 'Everything is saved only in your browser - no account, no tracking. You can install it to your home screen and use it like a regular app.',
+    streakLabel: n => n===0 ? 'No streak yet - check off a task to start' : `${n} day${n===1?'':'s'} streak 🔥`,
+    statsTitle: 'My week', statsEmpty: "You haven't checked off any tasks this week yet",
+    summaryBtn: '📋 Daily summary', summaryTitle: 'Daily summary',
+    summaryDone: n=>`Completed: ${n}`, summaryLeft: n=>`Left: ${n}`, summaryNone: 'No tasks for "Today" yet',
+    notifyBtnOn: '🔔 Reminders on', notifyBtnOff: '🔔 Turn on reminders',
+    notifyDenied: 'Permission was blocked in the browser - you can change it in site settings',
+    notifyLimitNote: '(only works while the site is open)',
+    onboardSkip: 'Skip', onboardNext: 'Next', onboardStart: "Let's start",
+    onboardSteps: [
+      {emoji:'👋', title:'Welcome to Manage It', body:"Tell it what you need to do and how long it takes - it builds your schedule for you."},
+      {emoji:'🗂️', title:'Everything sorted by category', body:'Study, hobbies, food, sleep - each task gets a color, so you can see how your day breaks down at a glance.'},
+      {emoji:'🔥', title:'Stay consistent, see results', body:'Check off tasks to build a streak and see your weekly stats. Ready?'}
+    ],
+    categories: {study:'Study', hobby:'Hobbies', food:'Food', sleep:'Sleep', other:'Other'},
+    suggestions: {walk:'Short walk outside', noscreen:'Sit for a minute, no screen', water:'Drink a big glass of water', stretch:'Stretch / move around',
+      tidy:'Tidy your room', friend:'Hang out with a friend', read:'Read a book', planTomorrow:'Plan tomorrow',
+      mealNoScreen:'Eat a meal screen-free', outside:'Step outside / balcony', breathe:'Breathe deeply for 5 min', sleepgo:'Go to sleep'}
+  },
+  es: {
+    tagline: 'Dile qué necesitas hacer — Manage It arma tu horario',
+    settingsTitle: 'Ajustes de mi día',
+    dayStart: 'Hora de inicio', dayEnd: 'Hora de fin', numDays: '¿Para cuántos días planear?', bedtime: 'Meta de hora de dormir',
+    taskCardTitle: '¿Qué tienes que hacer?', taskLabel: 'Tarea', taskPlaceholder: 'p. ej. Tarea de matemáticas',
+    categoryLabel: 'Categoría', dayLabel: '¿Qué día?', todayChip: 'Hoy', dayChip: n=>`Día ${n}`,
+    durationLabel: 'Duración', durHoursLabel: 'horas', durMinLabel: 'min',
+    durLabels: {15:'15 min', 30:'30 min', 45:'45 min', 60:'1 hora', 90:'1.5 horas', 120:'2 horas'},
+    fixedToggle: 'Esto tiene que pasar a una hora específica', fixedTimeLabel: 'Hora exacta', addBtn: 'Agregar a mi día',
+    suggestTitle: 'Ideas para tu día ✦', refreshSuggest: 'Más ideas',
+    railTitle: (d,s,e) => `Línea de ${d} (${s}–${e})`,
+    tasksTitle: 'Mis tareas', emptyDay: 'Aún no hay tareas para este día. Agrega una arriba ⬆',
+    overflowNote: ' · Sin espacio hoy — vale la pena revisar', resetLink: 'Empezar de nuevo (borra todo)',
+    resetConfirm: '¿Borrar todas las tareas y empezar de nuevo?', now: 'Ahora', minutesWord: 'min',
+    templatesTitle: 'Plantillas de día', saveTemplateBtn: 'Guardar el día mostrado como plantilla',
+    noTemplates: 'Aún no hay plantillas guardadas. Arma un día y guárdalo como plantilla ⬆',
+    templatePromptName: '¿Cómo se debe llamar esta plantilla?', templateEmptyDay: 'No hay tareas en el día mostrado para guardar',
+    templateApplyConfirm: name => `¿Reemplazar las tareas del día seleccionado con la plantilla "${name}"?`,
+    templateDeleteConfirm: name => `¿Eliminar la plantilla "${name}"?`,
+    shareBtn: '🔗 Compartir con un amigo', shareCopied: '✓ ¡Copiado!',
+    aboutBtn: 'ℹ️ Acerca de',
+    aboutTitle: '¿Qué es Manage It?',
+    aboutBody1: 'Manage It te ayuda a planear tu día - tareas, estudio, pasatiempos, comida y sueño - todo en un solo lugar. Escribes lo que tienes que hacer y cuánto tiempo toma, y el sitio arma tu horario automáticamente.',
+    aboutBody2: 'Todo se guarda solo en tu navegador - sin cuenta, sin seguimiento. Puedes instalarlo en tu pantalla de inicio y usarlo como una app normal.',
+    streakLabel: n => n===0 ? 'Sin racha todavía - marca una tarea para empezar' : `${n} día${n===1?'':'s'} de racha 🔥`,
+    statsTitle: 'Mi semana', statsEmpty: 'Aún no has marcado tareas esta semana',
+    summaryBtn: '📋 Resumen del día', summaryTitle: 'Resumen del día',
+    summaryDone: n=>`Completadas: ${n}`, summaryLeft: n=>`Restantes: ${n}`, summaryNone: 'Aún no hay tareas para "Hoy"',
+    notifyBtnOn: '🔔 Recordatorios activos', notifyBtnOff: '🔔 Activar recordatorios',
+    notifyDenied: 'El permiso fue bloqueado en el navegador - puedes cambiarlo en la configuración del sitio',
+    notifyLimitNote: '(solo funciona con el sitio abierto)',
+    onboardSkip: 'Saltar', onboardNext: 'Siguiente', onboardStart: 'Empecemos',
+    onboardSteps: [
+      {emoji:'👋', title:'Bienvenido a Manage It', body:'Dinos qué tienes que hacer y cuánto tiempo toma - nosotros armamos tu horario.'},
+      {emoji:'🗂️', title:'Todo organizado por categoría', body:'Estudio, pasatiempos, comida, sueño - cada tarea tiene un color, para que veas cómo se reparte tu día de un vistazo.'},
+      {emoji:'🔥', title:'Sé constante, ve resultados', body:'Marca tareas para construir una racha y ver tus estadísticas semanales. ¿Listo?'}
+    ],
+    categories: {study:'Estudio', hobby:'Pasatiempos', food:'Comida', sleep:'Sueño', other:'Otro'},
+    suggestions: {walk:'Caminata corta afuera', noscreen:'Siéntate un momento sin pantalla', water:'Toma un vaso grande de agua', stretch:'Estira / muévete',
+      tidy:'Ordena tu cuarto', friend:'Sal con un amigo', read:'Lee un libro', planTomorrow:'Planea mañana',
+      mealNoScreen:'Come sin pantalla', outside:'Sal al patio / balcón', breathe:'Respira profundo 5 min', sleepgo:'Ve a dormir'}
+  },
+  fr: {
+    tagline: "Dis-lui ce que tu dois faire — Manage It construit ton emploi du temps",
+    settingsTitle: 'Réglages de ma journée',
+    dayStart: 'Heure de début', dayEnd: 'Heure de fin', numDays: 'Planifier pour combien de jours ?', bedtime: 'Objectif heure de coucher',
+    taskCardTitle: "Qu'est-ce que tu dois faire ?", taskLabel: 'Tâche', taskPlaceholder: 'ex. Devoirs de maths',
+    categoryLabel: 'Catégorie', dayLabel: 'Quel jour ?', todayChip: "Aujourd'hui", dayChip: n=>`Jour ${n}`,
+    durationLabel: 'Durée', durHoursLabel: 'heures', durMinLabel: 'min',
+    durLabels: {15:'15 min', 30:'30 min', 45:'45 min', 60:'1 heure', 90:'1 h 30', 120:'2 heures'},
+    fixedToggle: "Ça doit se passer à une heure précise", fixedTimeLabel: 'Heure exacte', addBtn: 'Ajouter à ma journée',
+    suggestTitle: 'Idées pour ta journée ✦', refreshSuggest: 'Autres idées',
+    railTitle: (d,s,e) => `Ligne de ${d} (${s}–${e})`,
+    tasksTitle: 'Mes tâches', emptyDay: "Pas encore de tâches pour ce jour. Ajoutes-en une ci-dessus ⬆",
+    overflowNote: ' · Pas de place aujourd\'hui — à vérifier', resetLink: 'Recommencer (supprime tout)',
+    resetConfirm: 'Supprimer toutes les tâches et recommencer ?', now: 'Maintenant', minutesWord: 'min',
+    templatesTitle: 'Modèles de journée', saveTemplateBtn: 'Enregistrer la journée affichée comme modèle',
+    noTemplates: "Pas encore de modèles enregistrés. Construis une journée et enregistre-la comme modèle ⬆",
+    templatePromptName: 'Comment veux-tu appeler ce modèle ?', templateEmptyDay: 'Aucune tâche dans la journée affichée à enregistrer',
+    templateApplyConfirm: name => `Remplacer les tâches du jour sélectionné par le modèle "${name}" ?`,
+    templateDeleteConfirm: name => `Supprimer le modèle "${name}" ?`,
+    shareBtn: '🔗 Partager avec un ami', shareCopied: '✓ Copié !',
+    aboutBtn: 'ℹ️ À propos',
+    aboutTitle: "Qu'est-ce que Manage It ?",
+    aboutBody1: "Manage It t'aide à planifier ta journée - tâches, études, loisirs, alimentation et sommeil - tout en un seul endroit. Tu écris ce que tu dois faire et combien de temps ça prend, et le site construit ton emploi du temps automatiquement.",
+    aboutBody2: "Tout est enregistré uniquement dans ton navigateur - pas de compte, pas de suivi. Tu peux l'installer sur ton écran d'accueil et l'utiliser comme une vraie appli.",
+    streakLabel: n => n===0 ? 'Pas encore de série - coche une tâche pour commencer' : `${n} jour${n===1?'':'s'} de suite 🔥`,
+    statsTitle: 'Ma semaine', statsEmpty: "Tu n'as pas encore coché de tâches cette semaine",
+    summaryBtn: '📋 Résumé du jour', summaryTitle: 'Résumé du jour',
+    summaryDone: n=>`Terminées : ${n}`, summaryLeft: n=>`Restantes : ${n}`, summaryNone: "Pas encore de tâches pour \"Aujourd'hui\"",
+    notifyBtnOn: '🔔 Rappels activés', notifyBtnOff: '🔔 Activer les rappels',
+    notifyDenied: 'La permission a été bloquée dans le navigateur - tu peux la changer dans les paramètres du site',
+    notifyLimitNote: '(fonctionne seulement si le site est ouvert)',
+    onboardSkip: 'Passer', onboardNext: 'Suivant', onboardStart: 'Commençons',
+    onboardSteps: [
+      {emoji:'👋', title:'Bienvenue sur Manage It', body:"Dis-nous ce que tu dois faire et combien de temps ça prend - on construit ton emploi du temps."},
+      {emoji:'🗂️', title:'Tout est trié par catégorie', body:"Études, loisirs, alimentation, sommeil - chaque tâche a une couleur, pour voir en un coup d'œil comment se répartit ta journée."},
+      {emoji:'🔥', title:'Reste régulier, vois les résultats', body:'Coche les tâches pour construire une série et voir tes statistiques hebdomadaires. Prêt ?'}
+    ],
+    categories: {study:'Études', hobby:'Loisirs', food:'Alimentation', sleep:'Sommeil', other:'Autre'},
+    suggestions: {walk:'Petite marche dehors', noscreen:'Assieds-toi un moment sans écran', water:"Bois un grand verre d'eau", stretch:'Étirements / bouge un peu',
+      tidy:'Range ta chambre', friend:'Sors avec un ami', read:'Lis un livre', planTomorrow:'Planifie demain',
+      mealNoScreen:'Repas sans écran', outside:'Sors dans le jardin / sur le balcon', breathe:'Respire profondément 5 min', sleepgo:'Va te coucher'}
+  },
+  de: {
+    tagline: 'Sag ihm, was du zu tun hast — Manage It erstellt deinen Zeitplan',
+    settingsTitle: 'Meine Tageseinstellungen',
+    dayStart: 'Startzeit', dayEnd: 'Endzeit', numDays: 'Für wie viele Tage planen?', bedtime: 'Schlafenszeit-Ziel',
+    taskCardTitle: 'Was musst du tun?', taskLabel: 'Aufgabe', taskPlaceholder: 'z. B. Matheaufgaben',
+    categoryLabel: 'Kategorie', dayLabel: 'Welcher Tag?', todayChip: 'Heute', dayChip: n=>`Tag ${n}`,
+    durationLabel: 'Dauer', durHoursLabel: 'Std', durMinLabel: 'Min',
+    durLabels: {15:'15 Min', 30:'30 Min', 45:'45 Min', 60:'1 Std', 90:'1,5 Std', 120:'2 Std'},
+    fixedToggle: 'Das muss zu einer bestimmten Zeit passieren', fixedTimeLabel: 'Genaue Uhrzeit', addBtn: 'Zu meinem Tag hinzufügen',
+    suggestTitle: 'Ideen für deinen Tag ✦', refreshSuggest: 'Andere Ideen',
+    railTitle: (d,s,e) => `${d}-Zeitleiste (${s}–${e})`,
+    tasksTitle: 'Meine Aufgaben', emptyDay: 'Noch keine Aufgaben für diesen Tag. Füge oben eine hinzu ⬆',
+    overflowNote: ' · Kein Platz heute — sieh mal nach', resetLink: 'Neu starten (löscht alles)',
+    resetConfirm: 'Alle Aufgaben löschen und neu starten?', now: 'Jetzt', minutesWord: 'Min',
+    templatesTitle: 'Tagesvorlagen', saveTemplateBtn: 'Angezeigten Tag als Vorlage speichern',
+    noTemplates: 'Noch keine Vorlagen gespeichert. Erstelle einen Tag und speichere ihn als Vorlage ⬆',
+    templatePromptName: 'Wie soll diese Vorlage heißen?', templateEmptyDay: 'Keine Aufgaben im angezeigten Tag zum Speichern',
+    templateApplyConfirm: name => `Aufgaben des ausgewählten Tages durch die Vorlage "${name}" ersetzen?`,
+    templateDeleteConfirm: name => `Vorlage "${name}" löschen?`,
+    shareBtn: '🔗 Mit Freund teilen', shareCopied: '✓ Kopiert!',
+    aboutBtn: 'ℹ️ Über',
+    aboutTitle: 'Was ist Manage It?',
+    aboutBody1: 'Manage It hilft dir, deinen Tag zu planen - Aufgaben, Schule, Hobbys, Essen und Schlaf - alles an einem Ort. Du schreibst, was du zu tun hast und wie lange es dauert, und die Seite erstellt automatisch deinen Zeitplan.',
+    aboutBody2: 'Alles wird nur in deinem Browser gespeichert - kein Konto, kein Tracking. Du kannst es auf deinem Startbildschirm installieren und wie eine normale App nutzen.',
+    streakLabel: n => n===0 ? 'Noch keine Serie - hake eine Aufgabe ab, um zu starten' : `${n} Tag${n===1?'':'e'} in Folge 🔥`,
+    statsTitle: 'Meine Woche', statsEmpty: 'Du hast diese Woche noch keine Aufgaben abgehakt',
+    summaryBtn: '📋 Tageszusammenfassung', summaryTitle: 'Tageszusammenfassung',
+    summaryDone: n=>`Erledigt: ${n}`, summaryLeft: n=>`Übrig: ${n}`, summaryNone: 'Noch keine Aufgaben für "Heute"',
+    notifyBtnOn: '🔔 Erinnerungen an', notifyBtnOff: '🔔 Erinnerungen aktivieren',
+    notifyDenied: 'Die Berechtigung wurde im Browser blockiert - du kannst sie in den Website-Einstellungen ändern',
+    notifyLimitNote: '(funktioniert nur bei geöffneter Seite)',
+    onboardSkip: 'Überspringen', onboardNext: 'Weiter', onboardStart: "Los geht's",
+    onboardSteps: [
+      {emoji:'👋', title:'Willkommen bei Manage It', body:'Sag uns, was du zu tun hast und wie lange es dauert - wir erstellen deinen Zeitplan.'},
+      {emoji:'🗂️', title:'Alles nach Kategorie sortiert', body:'Schule, Hobbys, Essen, Schlaf - jede Aufgabe bekommt eine Farbe, damit du auf einen Blick siehst, wie sich dein Tag aufteilt.'},
+      {emoji:'🔥', title:'Bleib dran, sieh Ergebnisse', body:'Hake Aufgaben ab, um eine Serie aufzubauen und deine wöchentliche Statistik zu sehen. Bereit?'}
+    ],
+    categories: {study:'Schule', hobby:'Hobbys', food:'Essen', sleep:'Schlaf', other:'Sonstiges'},
+    suggestions: {walk:'Kurzer Spaziergang draußen', noscreen:'Setz dich kurz hin, ohne Bildschirm', water:'Trink ein großes Glas Wasser', stretch:'Dehnen / bewegen',
+      tidy:'Räum dein Zimmer auf', friend:'Triff dich mit einem Freund', read:'Lies ein Buch', planTomorrow:'Plane morgen',
+      mealNoScreen:'Iss ohne Bildschirm', outside:'Geh raus auf den Balkon/Hof', breathe:'Atme 5 Min tief durch', sleepgo:'Geh schlafen'}
+  },
+  it: {
+    tagline: 'Digli cosa devi fare — Manage It costruisce il tuo programma',
+    settingsTitle: 'Impostazioni della mia giornata',
+    dayStart: 'Ora di inizio', dayEnd: 'Ora di fine', numDays: 'Per quanti giorni pianificare?', bedtime: "Obiettivo ora di andare a dormire",
+    taskCardTitle: 'Cosa devi fare?', taskLabel: 'Attività', taskPlaceholder: 'es. Compiti di matematica',
+    categoryLabel: 'Categoria', dayLabel: 'Quale giorno?', todayChip: 'Oggi', dayChip: n=>`Giorno ${n}`,
+    durationLabel: 'Durata', durHoursLabel: 'ore', durMinLabel: 'min',
+    durLabels: {15:'15 min', 30:'30 min', 45:'45 min', 60:'1 ora', 90:'1,5 ore', 120:'2 ore'},
+    fixedToggle: "Deve succedere a un'ora precisa", fixedTimeLabel: 'Ora esatta', addBtn: 'Aggiungi alla mia giornata',
+    suggestTitle: 'Idee per la tua giornata ✦', refreshSuggest: 'Altre idee',
+    railTitle: (d,s,e) => `Linea di ${d} (${s}–${e})`,
+    tasksTitle: 'Le mie attività', emptyDay: "Ancora nessuna attività per questo giorno. Aggiungine una sopra ⬆",
+    overflowNote: ' · Nessuno spazio oggi — controlla', resetLink: 'Ricomincia (cancella tutto)',
+    resetConfirm: 'Cancellare tutte le attività e ricominciare?', now: 'Ora', minutesWord: 'min',
+    templatesTitle: 'Modelli di giornata', saveTemplateBtn: 'Salva la giornata mostrata come modello',
+    noTemplates: 'Ancora nessun modello salvato. Crea una giornata e salvala come modello ⬆',
+    templatePromptName: 'Come vuoi chiamare questo modello?', templateEmptyDay: 'Nessuna attività nella giornata mostrata da salvare',
+    templateApplyConfirm: name => `Sostituire le attività del giorno selezionato con il modello "${name}"?`,
+    templateDeleteConfirm: name => `Eliminare il modello "${name}"?`,
+    shareBtn: '🔗 Condividi con un amico', shareCopied: '✓ Copiato!',
+    aboutBtn: 'ℹ️ Info',
+    aboutTitle: "Cos'è Manage It?",
+    aboutBody1: "Manage It ti aiuta a pianificare la tua giornata - attività, scuola, hobby, cibo e sonno - tutto in un posto solo. Scrivi cosa devi fare e quanto tempo richiede, e il sito costruisce il tuo programma automaticamente.",
+    aboutBody2: "Tutto viene salvato solo nel tuo browser - senza account, senza tracciamento. Puoi installarlo sulla schermata home e usarlo come un'app vera.",
+    streakLabel: n => n===0 ? "Ancora nessuna serie - segna un'attività per iniziare" : `${n} giorno${n===1?'':'i'} di fila 🔥`,
+    statsTitle: 'La mia settimana', statsEmpty: 'Non hai ancora segnato attività questa settimana',
+    summaryBtn: '📋 Riepilogo del giorno', summaryTitle: 'Riepilogo del giorno',
+    summaryDone: n=>`Completate: ${n}`, summaryLeft: n=>`Rimaste: ${n}`, summaryNone: 'Ancora nessuna attività per "Oggi"',
+    notifyBtnOn: '🔔 Promemoria attivi', notifyBtnOff: '🔔 Attiva promemoria',
+    notifyDenied: 'Il permesso è stato bloccato nel browser - puoi cambiarlo nelle impostazioni del sito',
+    notifyLimitNote: '(funziona solo con il sito aperto)',
+    onboardSkip: 'Salta', onboardNext: 'Avanti', onboardStart: 'Iniziamo',
+    onboardSteps: [
+      {emoji:'👋', title:'Benvenuto su Manage It', body:'Dicci cosa devi fare e quanto tempo richiede - costruiamo il tuo programma.'},
+      {emoji:'🗂️', title:'Tutto organizzato per categoria', body:"Scuola, hobby, cibo, sonno - ogni attività ha un colore, così vedi a colpo d'occhio come si divide la tua giornata."},
+      {emoji:'🔥', title:'Sii costante, vedi i risultati', body:'Segna le attività per costruire una serie e vedere le tue statistiche settimanali. Pronto?'}
+    ],
+    categories: {study:'Scuola', hobby:'Hobby', food:'Cibo', sleep:'Sonno', other:'Altro'},
+    suggestions: {walk:'Breve passeggiata fuori', noscreen:'Siediti un momento senza schermo', water:"Bevi un grande bicchiere d'acqua", stretch:'Stiramenti / muoviti',
+      tidy:'Riordina la tua stanza', friend:'Esci con un amico', read:'Leggi un libro', planTomorrow:'Pianifica domani',
+      mealNoScreen:'Pasto senza schermo', outside:'Esci in giardino / balcone', breathe:'Respira profondamente 5 min', sleepgo:'Vai a dormire'}
+  },
+  pt: {
+    tagline: 'Diga o que você precisa fazer — Manage It monta sua agenda',
+    settingsTitle: 'Configurações do meu dia',
+    dayStart: 'Hora de início', dayEnd: 'Hora de término', numDays: 'Planejar para quantos dias?', bedtime: 'Meta de horário de dormir',
+    taskCardTitle: 'O que você precisa fazer?', taskLabel: 'Tarefa', taskPlaceholder: 'ex. Dever de matemática',
+    categoryLabel: 'Categoria', dayLabel: 'Qual dia?', todayChip: 'Hoje', dayChip: n=>`Dia ${n}`,
+    durationLabel: 'Duração', durHoursLabel: 'horas', durMinLabel: 'min',
+    durLabels: {15:'15 min', 30:'30 min', 45:'45 min', 60:'1 hora', 90:'1h30', 120:'2 horas'},
+    fixedToggle: 'Isso precisa acontecer em um horário específico', fixedTimeLabel: 'Horário exato', addBtn: 'Adicionar ao meu dia',
+    suggestTitle: 'Ideias para seu dia ✦', refreshSuggest: 'Outras ideias',
+    railTitle: (d,s,e) => `Linha de ${d} (${s}–${e})`,
+    tasksTitle: 'Minhas tarefas', emptyDay: 'Ainda não há tarefas para este dia. Adicione uma acima ⬆',
+    overflowNote: ' · Sem espaço hoje — vale a pena checar', resetLink: 'Recomeçar (apaga tudo)',
+    resetConfirm: 'Apagar todas as tarefas e recomeçar?', now: 'Agora', minutesWord: 'min',
+    templatesTitle: 'Modelos de dia', saveTemplateBtn: 'Salvar o dia exibido como modelo',
+    noTemplates: 'Ainda não há modelos salvos. Monte um dia e salve-o como modelo ⬆',
+    templatePromptName: 'Como este modelo deve se chamar?', templateEmptyDay: 'Nenhuma tarefa no dia exibido para salvar',
+    templateApplyConfirm: name => `Substituir as tarefas do dia selecionado pelo modelo "${name}"?`,
+    templateDeleteConfirm: name => `Excluir o modelo "${name}"?`,
+    shareBtn: '🔗 Compartilhar com um amigo', shareCopied: '✓ Copiado!',
+    aboutBtn: 'ℹ️ Sobre',
+    aboutTitle: 'O que é o Manage It?',
+    aboutBody1: 'O Manage It ajuda você a planejar seu dia - tarefas, estudos, hobbies, alimentação e sono - tudo em um só lugar. Você escreve o que precisa fazer e quanto tempo leva, e o site monta sua agenda automaticamente.',
+    aboutBody2: 'Tudo é salvo apenas no seu navegador - sem conta, sem rastreamento. Você pode instalá-lo na tela inicial e usá-lo como um app de verdade.',
+    streakLabel: n => n===0 ? 'Ainda sem sequência - marque uma tarefa para começar' : `${n} dia${n===1?'':'s'} seguidos 🔥`,
+    statsTitle: 'Minha semana', statsEmpty: 'Você ainda não marcou tarefas esta semana',
+    summaryBtn: '📋 Resumo do dia', summaryTitle: 'Resumo do dia',
+    summaryDone: n=>`Concluídas: ${n}`, summaryLeft: n=>`Restantes: ${n}`, summaryNone: 'Ainda não há tarefas para "Hoje"',
+    notifyBtnOn: '🔔 Lembretes ativos', notifyBtnOff: '🔔 Ativar lembretes',
+    notifyDenied: 'A permissão foi bloqueada no navegador - você pode mudar isso nas configurações do site',
+    notifyLimitNote: '(só funciona com o site aberto)',
+    onboardSkip: 'Pular', onboardNext: 'Próximo', onboardStart: 'Vamos começar',
+    onboardSteps: [
+      {emoji:'👋', title:'Bem-vindo ao Manage It', body:'Diga o que você precisa fazer e quanto tempo leva - nós montamos sua agenda.'},
+      {emoji:'🗂️', title:'Tudo organizado por categoria', body:'Estudos, hobbies, alimentação, sono - cada tarefa recebe uma cor, para você ver rapidamente como seu dia se divide.'},
+      {emoji:'🔥', title:'Seja consistente, veja resultados', body:'Marque tarefas para criar uma sequência e ver suas estatísticas semanais. Pronto?'}
+    ],
+    categories: {study:'Estudos', hobby:'Hobbies', food:'Alimentação', sleep:'Sono', other:'Outro'},
+    suggestions: {walk:'Caminhada curta lá fora', noscreen:'Sente-se um momento sem tela', water:'Beba um copo grande de água', stretch:'Alongue-se / mexa-se',
+      tidy:'Arrume seu quarto', friend:'Saia com um amigo', read:'Leia um livro', planTomorrow:'Planeje amanhã',
+      mealNoScreen:'Coma sem tela', outside:'Vá para o quintal / varanda', breathe:'Respire fundo por 5 min', sleepgo:'Vá dormir'}
+  },
+  ru: {
+    tagline: 'Скажи, что нужно сделать — Manage It составит твоё расписание',
+    settingsTitle: 'Настройки моего дня',
+    dayStart: 'Время начала', dayEnd: 'Время окончания', numDays: 'На сколько дней планировать?', bedtime: 'Цель времени сна',
+    taskCardTitle: 'Что тебе нужно сделать?', taskLabel: 'Задача', taskPlaceholder: 'напр. Домашка по математике',
+    categoryLabel: 'Категория', dayLabel: 'На какой день?', todayChip: 'Сегодня', dayChip: n=>`День ${n}`,
+    durationLabel: 'Продолжительность', durHoursLabel: 'ч', durMinLabel: 'мин',
+    durLabels: {15:'15 мин', 30:'30 мин', 45:'45 мин', 60:'1 час', 90:'1,5 часа', 120:'2 часа'},
+    fixedToggle: 'Это должно произойти в определённое время', fixedTimeLabel: 'Точное время', addBtn: 'Добавить в мой день',
+    suggestTitle: 'Идеи для твоего дня ✦', refreshSuggest: 'Другие идеи',
+    railTitle: (d,s,e) => `Шкала ${d} (${s}–${e})`,
+    tasksTitle: 'Мои задачи', emptyDay: 'Пока нет задач на этот день. Добавь одну выше ⬆',
+    overflowNote: ' · Нет места сегодня — стоит проверить', resetLink: 'Начать заново (удалит всё)',
+    resetConfirm: 'Удалить все задачи и начать заново?', now: 'Сейчас', minutesWord: 'мин',
+    templatesTitle: 'Шаблоны дня', saveTemplateBtn: 'Сохранить показанный день как шаблон',
+    noTemplates: 'Пока нет сохранённых шаблонов. Составь день и сохрани его как шаблон ⬆',
+    templatePromptName: 'Как назвать этот шаблон?', templateEmptyDay: 'Нет задач в показанном дне для сохранения',
+    templateApplyConfirm: name => `Заменить задачи выбранного дня шаблоном "${name}"?`,
+    templateDeleteConfirm: name => `Удалить шаблон "${name}"?`,
+    shareBtn: '🔗 Поделиться с другом', shareCopied: '✓ Скопировано!',
+    aboutBtn: 'ℹ️ О приложении',
+    aboutTitle: 'Что такое Manage It?',
+    aboutBody1: 'Manage It помогает планировать твой день - задачи, учёбу, хобби, питание и сон - всё в одном месте. Ты пишешь, что нужно сделать и сколько это займёт, а сайт сам составляет расписание.',
+    aboutBody2: 'Всё сохраняется только в твоём браузере - без аккаунта, без слежки. Можно установить на главный экран и пользоваться как обычным приложением.',
+    streakLabel: n => n===0 ? 'Серии пока нет - отметь задачу, чтобы начать' : `${n} ${n===1?'день':'дней'} подряд 🔥`,
+    statsTitle: 'Моя неделя', statsEmpty: 'Ты ещё не отмечал задачи на этой неделе',
+    summaryBtn: '📋 Итог дня', summaryTitle: 'Итог дня',
+    summaryDone: n=>`Выполнено: ${n}`, summaryLeft: n=>`Осталось: ${n}`, summaryNone: 'Пока нет задач на "Сегодня"',
+    notifyBtnOn: '🔔 Напоминания включены', notifyBtnOff: '🔔 Включить напоминания',
+    notifyDenied: 'Разрешение заблокировано в браузере - можно изменить в настройках сайта',
+    notifyLimitNote: '(работает, только если сайт открыт)',
+    onboardSkip: 'Пропустить', onboardNext: 'Далее', onboardStart: 'Начнём',
+    onboardSteps: [
+      {emoji:'👋', title:'Добро пожаловать в Manage It', body:'Скажи, что нужно сделать и сколько это займёт - мы составим твоё расписание.'},
+      {emoji:'🗂️', title:'Всё разложено по категориям', body:'Учёба, хобби, питание, сон - у каждой задачи свой цвет, чтобы сразу видеть, как распределён твой день.'},
+      {emoji:'🔥', title:'Будь последователен, увидь результат', body:'Отмечай задачи, чтобы собрать серию и увидеть недельную статистику. Готов?'}
+    ],
+    categories: {study:'Учёба', hobby:'Хобби', food:'Питание', sleep:'Сон', other:'Другое'},
+    suggestions: {walk:'Короткая прогулка на улице', noscreen:'Посиди немного без экрана', water:'Выпей большой стакан воды', stretch:'Растяжка / разминка',
+      tidy:'Убери в комнате', friend:'Погуляй с другом', read:'Почитай книгу', planTomorrow:'Спланируй завтра',
+      mealNoScreen:'Поешь без экрана', outside:'Выйди во двор / на балкон', breathe:'Подыши глубоко 5 мин', sleepgo:'Ложись спать'}
+  },
+  ar: {
+    tagline: 'أخبره بما تحتاج فعله — Manage It يبني لك جدولك',
+    settingsTitle: 'إعدادات يومي',
+    dayStart: 'وقت البدء', dayEnd: 'وقت الانتهاء', numDays: 'التخطيط لكم يوم؟', bedtime: 'هدف وقت النوم',
+    taskCardTitle: 'ما الذي تحتاج فعله؟', taskLabel: 'المهمة', taskPlaceholder: 'مثال: واجب الرياضيات',
+    categoryLabel: 'الفئة', dayLabel: 'أي يوم؟', todayChip: 'اليوم', dayChip: n=>`اليوم ${n}`,
+    durationLabel: 'المدة', durHoursLabel: 'ساعات', durMinLabel: 'دقيقة',
+    durLabels: {15:'15 دقيقة', 30:'30 دقيقة', 45:'45 دقيقة', 60:'ساعة', 90:'ساعة ونصف', 120:'ساعتان'},
+    fixedToggle: 'يجب أن يحدث هذا في وقت محدد', fixedTimeLabel: 'الوقت الدقيق', addBtn: 'أضف إلى يومي',
+    suggestTitle: 'أفكار لإضافتها ليومك ✦', refreshSuggest: 'أفكار أخرى',
+    railTitle: (d,s,e) => `خط ${d} (${s}–${e})`,
+    tasksTitle: 'مهامي', emptyDay: 'لا توجد مهام لهذا اليوم بعد. أضف واحدة أعلاه ⬆',
+    overflowNote: ' · لا يوجد مكان اليوم — يستحق المراجعة', resetLink: 'البدء من جديد (يحذف كل شيء)',
+    resetConfirm: 'حذف جميع المهام والبدء من جديد؟', now: 'الآن', minutesWord: 'د',
+    templatesTitle: 'قوالب اليوم', saveTemplateBtn: 'حفظ اليوم المعروض كقالب',
+    noTemplates: 'لا توجد قوالب محفوظة بعد. أنشئ يومًا واحفظه كقالب ⬆',
+    templatePromptName: 'ما اسم هذا القالب؟', templateEmptyDay: 'لا توجد مهام في اليوم المعروض لحفظها',
+    templateApplyConfirm: name => `استبدال مهام اليوم المحدد بقالب "${name}"؟`,
+    templateDeleteConfirm: name => `حذف القالب "${name}"؟`,
+    shareBtn: '🔗 شارك مع صديق', shareCopied: '✓ تم النسخ!',
+    aboutBtn: 'ℹ️ حول',
+    aboutTitle: 'ما هو Manage It؟',
+    aboutBody1: 'يساعدك Manage It على تخطيط يومك - المهام والدراسة والهوايات والطعام والنوم - كل ذلك في مكان واحد. تكتب ما تحتاج فعله والوقت الذي يستغرقه، ويبني الموقع جدولك تلقائيًا.',
+    aboutBody2: 'يُحفظ كل شيء في متصفحك فقط - بدون حساب، بدون تتبع. يمكنك تثبيته على الشاشة الرئيسية واستخدامه كتطبيق عادي.',
+    streakLabel: n => n===0 ? 'لا يوجد تتابع بعد - علّم مهمة للبدء' : `${n} ${n===1?'يوم':'أيام'} متتالية 🔥`,
+    statsTitle: 'أسبوعي', statsEmpty: 'لم تُعلّم أي مهام هذا الأسبوع بعد',
+    summaryBtn: '📋 ملخص اليوم', summaryTitle: 'ملخص اليوم',
+    summaryDone: n=>`أُنجز: ${n}`, summaryLeft: n=>`متبقٍ: ${n}`, summaryNone: 'لا توجد مهام لـ"اليوم" بعد',
+    notifyBtnOn: '🔔 التذكيرات مفعّلة', notifyBtnOff: '🔔 تفعيل التذكيرات',
+    notifyDenied: 'تم حظر الإذن في المتصفح - يمكنك تغييره في إعدادات الموقع',
+    notifyLimitNote: '(يعمل فقط عند فتح الموقع)',
+    onboardSkip: 'تخطي', onboardNext: 'التالي', onboardStart: 'لنبدأ',
+    onboardSteps: [
+      {emoji:'👋', title:'مرحبًا بك في Manage It', body:'أخبرنا بما تحتاج فعله والوقت الذي يستغرقه - سنبني لك جدولك.'},
+      {emoji:'🗂️', title:'كل شيء مرتب حسب الفئة', body:'الدراسة، الهوايات، الطعام، النوم - كل مهمة تحصل على لون، لترى بسهولة كيف يتوزع يومك.'},
+      {emoji:'🔥', title:'استمر وشاهد النتائج', body:'علّم المهام لبناء تتابع ومشاهدة إحصائياتك الأسبوعية. مستعد؟'}
+    ],
+    categories: {study:'الدراسة', hobby:'الهوايات', food:'الطعام', sleep:'النوم', other:'أخرى'},
+    suggestions: {walk:'نزهة قصيرة بالخارج', noscreen:'اجلس قليلاً بدون شاشة', water:'اشرب كوبًا كبيرًا من الماء', stretch:'تمدد / تحرك قليلاً',
+      tidy:'رتّب غرفتك', friend:'اخرج مع صديق', read:'اقرأ كتابًا', planTomorrow:'خطط للغد',
+      mealNoScreen:'تناول وجبة بدون شاشة', outside:'اخرج إلى الفناء / الشرفة', breathe:'تنفس بعمق 5 دقائق', sleepgo:'اذهب للنوم'}
+  },
+  zh: {
+    tagline: '告诉它你要做什么 — Manage It 帮你安排日程',
+    settingsTitle: '我的一天设置',
+    dayStart: '开始时间', dayEnd: '结束时间', numDays: '要规划几天？', bedtime: '目标睡觉时间',
+    taskCardTitle: '你需要做什么？', taskLabel: '任务', taskPlaceholder: '例如：数学作业',
+    categoryLabel: '类别', dayLabel: '哪一天？', todayChip: '今天', dayChip: n=>`第${n}天`,
+    durationLabel: '时长', durHoursLabel: '小时', durMinLabel: '分钟',
+    durLabels: {15:'15分钟', 30:'30分钟', 45:'45分钟', 60:'1小时', 90:'1.5小时', 120:'2小时'},
+    fixedToggle: '这件事必须在特定时间进行', fixedTimeLabel: '确切时间', addBtn: '添加到我的一天',
+    suggestTitle: '为你的一天添点新意 ✦', refreshSuggest: '换一批',
+    railTitle: (d,s,e) => `${d}时间线（${s}–${e}）`,
+    tasksTitle: '我的任务', emptyDay: '这一天还没有任务。在上面添加一个吧 ⬆',
+    overflowNote: ' · 今天没有空档了 — 建议检查一下', resetLink: '重新开始（清空所有内容）',
+    resetConfirm: '删除所有任务并重新开始？', now: '现在', minutesWord: '分钟',
+    templatesTitle: '每日模板', saveTemplateBtn: '将当前显示的这一天保存为模板',
+    noTemplates: '还没有保存的模板。安排好一天后把它保存为模板吧 ⬆',
+    templatePromptName: '这个模板叫什么名字？', templateEmptyDay: '当前显示的这一天没有任务可保存',
+    templateApplyConfirm: name => `用模板"${name}"替换所选日期的任务吗？`,
+    templateDeleteConfirm: name => `删除模板"${name}"吗？`,
+    shareBtn: '🔗 分享给朋友', shareCopied: '✓ 已复制！',
+    aboutBtn: 'ℹ️ 关于',
+    aboutTitle: 'Manage It 是什么？',
+    aboutBody1: 'Manage It 帮你规划一天 —— 任务、学习、爱好、饮食和睡眠，全部集中在一个地方。你写下要做的事和所需时间，网站会自动为你安排日程。',
+    aboutBody2: '所有数据只保存在你的浏览器里 —— 无需账号，不会被追踪。你可以把它安装到主屏幕，像普通应用一样使用。',
+    streakLabel: n => n===0 ? '还没有连续记录 — 勾选一个任务开始吧' : `连续 ${n} 天 🔥`,
+    statsTitle: '我的一周', statsEmpty: '这周你还没有勾选过任务',
+    summaryBtn: '📋 每日总结', summaryTitle: '每日总结',
+    summaryDone: n=>`已完成：${n}`, summaryLeft: n=>`剩余：${n}`, summaryNone: '"今天"还没有任务',
+    notifyBtnOn: '🔔 提醒已开启', notifyBtnOff: '🔔 开启提醒',
+    notifyDenied: '浏览器已阻止该权限 — 可以在网站设置中更改',
+    notifyLimitNote: '（仅在网站打开时有效）',
+    onboardSkip: '跳过', onboardNext: '下一步', onboardStart: '开始吧',
+    onboardSteps: [
+      {emoji:'👋', title:'欢迎使用 Manage It', body:'告诉我们你要做什么、需要多长时间 —— 我们帮你安排日程。'},
+      {emoji:'🗂️', title:'一切按类别分类', body:'学习、爱好、饮食、睡眠 —— 每个任务都有专属颜色，让你一眼看清一天是怎么安排的。'},
+      {emoji:'🔥', title:'坚持下去，看到成果', body:'勾选任务来建立连续记录，查看每周统计。准备好了吗？'}
+    ],
+    categories: {study:'学习', hobby:'爱好', food:'饮食', sleep:'睡眠', other:'其他'},
+    suggestions: {walk:'出去短暂散步', noscreen:'不看屏幕坐一会儿', water:'喝一大杯水', stretch:'拉伸 / 活动一下',
+      tidy:'整理房间', friend:'和朋友出去玩', read:'读一本书', planTomorrow:'规划明天',
+      mealNoScreen:'吃饭不看屏幕', outside:'去院子/阳台走走', breathe:'深呼吸5分钟', sleepgo:'去睡觉'}
+  },
+  ja: {
+    tagline: 'やることを伝えれば — Manage It がスケジュールを組み立てます',
+    settingsTitle: '一日の設定',
+    dayStart: '開始時刻', dayEnd: '終了時刻', numDays: '何日分計画しますか？', bedtime: '目標就寝時刻',
+    taskCardTitle: '何をする必要がありますか？', taskLabel: 'タスク', taskPlaceholder: '例：数学の宿題',
+    categoryLabel: 'カテゴリー', dayLabel: 'どの日？', todayChip: '今日', dayChip: n=>`${n}日目`,
+    durationLabel: '所要時間', durHoursLabel: '時間', durMinLabel: '分',
+    durLabels: {15:'15分', 30:'30分', 45:'45分', 60:'1時間', 90:'1時間半', 120:'2時間'},
+    fixedToggle: '決まった時刻に行う必要がある', fixedTimeLabel: '正確な時刻', addBtn: '一日に追加',
+    suggestTitle: '一日に加えるアイデア ✦', refreshSuggest: '別のアイデア',
+    railTitle: (d,s,e) => `${d}のタイムライン（${s}〜${e}）`,
+    tasksTitle: 'タスク一覧', emptyDay: 'この日のタスクはまだありません。上で追加しましょう ⬆',
+    overflowNote: ' · 今日は空きがありません — 確認してみましょう', resetLink: '最初からやり直す（すべて削除）',
+    resetConfirm: 'すべてのタスクを削除して最初からやり直しますか？', now: '現在', minutesWord: '分',
+    templatesTitle: '一日のテンプレート', saveTemplateBtn: '表示中の一日をテンプレートとして保存',
+    noTemplates: '保存されたテンプレートはまだありません。一日を組み立ててテンプレートとして保存しましょう ⬆',
+    templatePromptName: 'このテンプレートの名前は？', templateEmptyDay: '表示中の日に保存できるタスクがありません',
+    templateApplyConfirm: name => `選択した日のタスクをテンプレート「${name}」に置き換えますか？`,
+    templateDeleteConfirm: name => `テンプレート「${name}」を削除しますか？`,
+    shareBtn: '🔗 友達と共有', shareCopied: '✓ コピーしました！',
+    aboutBtn: 'ℹ️ このアプリについて',
+    aboutTitle: 'Manage It とは？',
+    aboutBody1: 'Manage It は、タスク・勉強・趣味・食事・睡眠など、一日の予定をまとめて計画できるアプリです。やることと所要時間を書くだけで、サイトが自動的にスケジュールを組み立てます。',
+    aboutBody2: 'すべてのデータはブラウザにのみ保存されます — アカウント不要、追跡もありません。ホーム画面に追加すれば、普通のアプリのように使えます。',
+    streakLabel: n => n===0 ? 'まだ連続記録がありません。タスクにチェックを入れて始めましょう' : `${n}日連続 🔥`,
+    statsTitle: '今週の記録', statsEmpty: '今週はまだタスクにチェックを入れていません',
+    summaryBtn: '📋 今日のまとめ', summaryTitle: '今日のまとめ',
+    summaryDone: n=>`完了：${n}`, summaryLeft: n=>`残り：${n}`, summaryNone: '「今日」のタスクはまだありません',
+    notifyBtnOn: '🔔 リマインダーON', notifyBtnOff: '🔔 リマインダーを有効にする',
+    notifyDenied: 'ブラウザで許可がブロックされています — サイトの設定で変更できます',
+    notifyLimitNote: '（サイトが開いている時のみ動作）',
+    onboardSkip: 'スキップ', onboardNext: '次へ', onboardStart: '始めましょう',
+    onboardSteps: [
+      {emoji:'👋', title:'Manage It へようこそ', body:'やることと所要時間を教えてください — スケジュールを組み立てます。'},
+      {emoji:'🗂️', title:'カテゴリーごとに整理', body:'勉強、趣味、食事、睡眠 — タスクごとに色分けされるので、一日の内訳が一目でわかります。'},
+      {emoji:'🔥', title:'継続して結果を見よう', body:'タスクにチェックを入れて連続記録を作り、週間統計を確認しましょう。準備はいいですか？'}
+    ],
+    categories: {study:'勉強', hobby:'趣味', food:'食事', sleep:'睡眠', other:'その他'},
+    suggestions: {walk:'外を少し散歩する', noscreen:'画面を見ずに少し座る', water:'水を一杯たくさん飲む', stretch:'ストレッチ／体を動かす',
+      tidy:'部屋を片付ける', friend:'友達と出かける', read:'本を読む', planTomorrow:'明日の計画を立てる',
+      mealNoScreen:'画面を見ずに食事する', outside:'庭やベランダに出る', breathe:'5分間深呼吸する', sleepgo:'寝る'}
+  },
+  hi: {
+    tagline: 'बताएं कि क्या करना है — Manage It आपका शेड्यूल बनाएगा',
+    settingsTitle: 'मेरे दिन की सेटिंग्स',
+    dayStart: 'शुरू होने का समय', dayEnd: 'खत्म होने का समय', numDays: 'कितने दिनों की योजना बनानी है?', bedtime: 'सोने के समय का लक्ष्य',
+    taskCardTitle: 'आपको क्या करना है?', taskLabel: 'काम', taskPlaceholder: 'जैसे: गणित का होमवर्क',
+    categoryLabel: 'श्रेणी', dayLabel: 'कौन सा दिन?', todayChip: 'आज', dayChip: n=>`दिन ${n}`,
+    durationLabel: 'समय अवधि', durHoursLabel: 'घंटे', durMinLabel: 'मिनट',
+    durLabels: {15:'15 मिनट', 30:'30 मिनट', 45:'45 मिनट', 60:'1 घंटा', 90:'1.5 घंटे', 120:'2 घंटे'},
+    fixedToggle: 'यह एक निश्चित समय पर होना चाहिए', fixedTimeLabel: 'सटीक समय', addBtn: 'मेरे दिन में जोड़ें',
+    suggestTitle: 'आपके दिन के लिए विचार ✦', refreshSuggest: 'और विचार',
+    railTitle: (d,s,e) => `${d} की समयरेखा (${s}–${e})`,
+    tasksTitle: 'मेरे काम', emptyDay: 'इस दिन के लिए अभी तक कोई काम नहीं है। ऊपर एक जोड़ें ⬆',
+    overflowNote: ' · आज जगह नहीं है — जांच लें', resetLink: 'फिर से शुरू करें (सब कुछ मिटा देगा)',
+    resetConfirm: 'सभी काम मिटाकर फिर से शुरू करें?', now: 'अभी', minutesWord: 'मिनट',
+    templatesTitle: 'दिन के टेम्पलेट', saveTemplateBtn: 'दिखाए गए दिन को टेम्पलेट के रूप में सहेजें',
+    noTemplates: 'अभी तक कोई टेम्पलेट सहेजा नहीं गया है। एक दिन बनाएं और उसे टेम्पलेट के रूप में सहेजें ⬆',
+    templatePromptName: 'इस टेम्पलेट का नाम क्या रखें?', templateEmptyDay: 'सहेजने के लिए दिखाए गए दिन में कोई काम नहीं है',
+    templateApplyConfirm: name => `चुने गए दिन के काम को टेम्पलेट "${name}" से बदलें?`,
+    templateDeleteConfirm: name => `टेम्पलेट "${name}" मिटाएं?`,
+    shareBtn: '🔗 दोस्त के साथ शेयर करें', shareCopied: '✓ कॉपी हो गया!',
+    aboutBtn: 'ℹ️ जानकारी',
+    aboutTitle: 'Manage It क्या है?',
+    aboutBody1: 'Manage It आपको अपने दिन की योजना बनाने में मदद करता है - काम, पढ़ाई, शौक, खाना और नींद - सब एक ही जगह। आप लिखते हैं कि क्या करना है और कितना समय लगेगा, और साइट अपने आप आपका शेड्यूल बना देती है।',
+    aboutBody2: 'सब कुछ सिर्फ आपके ब्राउज़र में सेव होता है - कोई अकाउंट नहीं, कोई ट्रैकिंग नहीं। आप इसे होम स्क्रीन पर इंस्टॉल करके एक सामान्य ऐप की तरह इस्तेमाल कर सकते हैं।',
+    streakLabel: n => n===0 ? 'अभी तक कोई स्ट्रीक नहीं - शुरू करने के लिए एक काम चेक करें' : `${n} दिन लगातार 🔥`,
+    statsTitle: 'मेरा हफ्ता', statsEmpty: 'आपने इस हफ्ते अभी तक कोई काम चेक नहीं किया है',
+    summaryBtn: '📋 दिन का सारांश', summaryTitle: 'दिन का सारांश',
+    summaryDone: n=>`पूरे हुए: ${n}`, summaryLeft: n=>`बाकी: ${n}`, summaryNone: '"आज" के लिए अभी कोई काम नहीं है',
+    notifyBtnOn: '🔔 रिमाइंडर चालू हैं', notifyBtnOff: '🔔 रिमाइंडर चालू करें',
+    notifyDenied: 'ब्राउज़र में अनुमति ब्लॉक कर दी गई है - आप इसे साइट सेटिंग्स में बदल सकते हैं',
+    notifyLimitNote: '(केवल साइट खुली होने पर काम करता है)',
+    onboardSkip: 'छोड़ें', onboardNext: 'अगला', onboardStart: 'शुरू करते हैं',
+    onboardSteps: [
+      {emoji:'👋', title:'Manage It में आपका स्वागत है', body:'हमें बताएं कि क्या करना है और कितना समय लगेगा - हम आपका शेड्यूल बना देंगे।'},
+      {emoji:'🗂️', title:'सब कुछ श्रेणी के हिसाब से व्यवस्थित', body:'पढ़ाई, शौक, खाना, नींद - हर काम को एक रंग मिलता है, ताकि आप एक नज़र में देख सकें कि आपका दिन कैसे बंटा है।'},
+      {emoji:'🔥', title:'लगातार बने रहें, नतीजे देखें', body:'स्ट्रीक बनाने और साप्ताहिक आंकड़े देखने के लिए काम चेक करें। तैयार हैं?'}
+    ],
+    categories: {study:'पढ़ाई', hobby:'शौक', food:'खाना', sleep:'नींद', other:'अन्य'},
+    suggestions: {walk:'बाहर थोड़ी देर टहलें', noscreen:'बिना स्क्रीन के थोड़ी देर बैठें', water:'एक बड़ा गिलास पानी पिएं', stretch:'स्ट्रेच करें / हिलें-डुलें',
+      tidy:'अपना कमरा साफ करें', friend:'दोस्त के साथ बाहर जाएं', read:'एक किताब पढ़ें', planTomorrow:'कल की योजना बनाएं',
+      mealNoScreen:'बिना स्क्रीन के खाना खाएं', outside:'आंगन/बालकनी में जाएं', breathe:'5 मिनट गहरी सांस लें', sleepgo:'सोने जाएं'}
+  }
+};
+const RTL_LANGS = ['he','ar'];
+function t(){ return STR[settings.lang]; }
+
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function dateKey(d){ return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
+function timeToMinutes(tm){ const [h,m]=tm.split(':').map(Number); return h*60+m; }
+function minutesToTimeLabel(mins){
+  mins = ((mins % 1440) + 1440) % 1440;
+  const h = Math.floor(mins/60).toString().padStart(2,'0');
+  const m = (mins%60).toString().padStart(2,'0');
+  return `${h}:${m}`;
+}
+
+async function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      tasks = parsed.tasks || [];
+      templates = parsed.templates || [];
+      completions = parsed.completions || {};
+      settings = Object.assign(settings, parsed.settings || {});
+      seqCounter = parsed.seqCounter || tasks.length;
+    }
+  }catch(e){ tasks = []; }
+}
+async function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({tasks, templates, completions, settings, seqCounter})); }
+  catch(e){ console.error('Storage error', e); }
+}
+
+function applyLangAttrs(){
+  document.documentElement.lang = settings.lang;
+  document.documentElement.dir = RTL_LANGS.includes(settings.lang) ? 'rtl' : 'ltr';
+  document.getElementById('langSelect').value = settings.lang;
+  document.getElementById('shareBtn').textContent = t().shareBtn;
+  document.getElementById('aboutBtn').textContent = t().aboutBtn;
+  document.getElementById('summaryBtn').textContent = t().summaryBtn;
+  document.getElementById('durHoursLabelText').textContent = t().durHoursLabel;
+  document.getElementById('durMinLabelText').textContent = t().durMinLabel;
+  updateNotifyBtn();
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    if(typeof t()[key] === 'string') el.textContent = t()[key];
+  });
+  document.getElementById('titleInput').placeholder = t().taskPlaceholder;
+}
+
+// ---- Scheduling ----
+function scheduleAll(){ for(let d=0; d<settings.numDays; d++){ scheduleDay(d); } }
+function scheduleDay(dayIndex){
+  const dayTasks = tasks.filter(x=>x.day===dayIndex);
+  const fixed = dayTasks.filter(x=>x.fixedTime!=null).sort((a,b)=>a.fixedTime-b.fixedTime);
+  const flexible = dayTasks.filter(x=>x.fixedTime==null).sort((a,b)=>a.seq-b.seq);
+  let busy = [];
+  fixed.forEach(x=>{
+    let start = x.fixedTime;
+    for(const b of busy){ if(start < b.end && start + x.duration > b.start){ start = b.end; } }
+    const end = start + x.duration;
+    x.start = start;
+    x.overflow = end > settings.dayEnd || start < settings.dayStart;
+    busy.push({start, end}); busy.sort((a,b)=>a.start-b.start);
+  });
+  flexible.forEach(x=>{
+    let placed = false; let cursor = settings.dayStart;
+    const sortedBusy = [...busy].sort((a,b)=>a.start-b.start);
+    for(const b of sortedBusy){
+      if(b.start - cursor >= x.duration){ x.start = cursor; placed = true; break; }
+      cursor = Math.max(cursor, b.end);
+    }
+    if(!placed){ x.start = cursor; x.overflow = !(cursor + x.duration <= settings.dayEnd); placed = true; }
+    else{ x.overflow = false; }
+    busy.push({start:x.start, end:x.start+x.duration}); busy.sort((a,b)=>a.start-b.start);
+  });
+}
+
+// ---- Rendering ----
+function render(){
+  applyLangAttrs();
+  scheduleAll();
+  renderDurationChips();
+  renderCatChipsInForm();
+  renderDayChipsInForm();
+  renderDayTabs();
+  renderRail();
+  renderList();
+  renderLegend();
+  renderTemplates();
+  renderStreak();
+  renderWeeklyStats();
+}
+
+function computeStreak(){
+  const dateSet = new Set(Object.values(completions).map(c=>c.date));
+  let count = 0;
+  let cursor = new Date();
+  if(!dateSet.has(dateKey(cursor))){ cursor.setDate(cursor.getDate()-1); }
+  while(dateSet.has(dateKey(cursor))){ count++; cursor.setDate(cursor.getDate()-1); }
+  return count;
+}
+function computeWeeklyStats(){
+  const dateSet = new Set();
+  for(let i=0;i<7;i++){ const d=new Date(); d.setDate(d.getDate()-i); dateSet.add(dateKey(d)); }
+  const counts = {}; CAT_IDS.forEach(id=>counts[id]=0);
+  Object.values(completions).forEach(c=>{
+    if(dateSet.has(c.date) && counts.hasOwnProperty(c.category)) counts[c.category]++;
+  });
+  return counts;
+}
+function renderStreak(){
+  const n = computeStreak();
+  document.getElementById('streakBadge').textContent = t().streakLabel(n);
+}
+function renderWeeklyStats(){
+  const box = document.getElementById('statsContent');
+  const counts = computeWeeklyStats();
+  const total = Object.values(counts).reduce((a,b)=>a+b,0);
+  box.innerHTML = '';
+  if(total === 0){ box.innerHTML = `<div class="empty" style="padding:6px 0;">${t().statsEmpty}</div>`; return; }
+  const max = Math.max(...Object.values(counts), 1);
+  CAT_IDS.forEach(id=>{
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = `<div class="stat-row-top"><span>${t().categories[id]}</span><span class="cnt">${counts[id]}</span></div>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${(counts[id]/max*100)}%; background:${CAT_COLORS[id]}"></div></div>`;
+    box.appendChild(row);
+  });
+}
+function renderSummaryContent(){
+  const box = document.getElementById('summaryContent');
+  const todayTasks = tasks.filter(x=>x.day===0);
+  if(todayTasks.length === 0){ box.innerHTML = `<p>${t().summaryNone}</p>`; return; }
+  const done = todayTasks.filter(x=>x.done).length;
+  const left = todayTasks.length - done;
+  let html = `<div class="summary-row"><strong>${t().summaryDone(done)}</strong><strong>${t().summaryLeft(left)}</strong></div>`;
+  [...todayTasks].sort((a,b)=>a.start-b.start).forEach(x=>{
+    html += `<div class="summary-row"><span>${x.done?'✅':'⬜'} ${escapeHtml(x.title)}</span><span style="color:var(--muted)">${minutesToTimeLabel(x.start)}</span></div>`;
+  });
+  box.innerHTML = html;
+}
+
+function renderTemplates(){
+  document.getElementById('saveTemplateBtn').textContent = t().saveTemplateBtn;
+  const box = document.getElementById('templateChips');
+  const emptyBox = document.getElementById('templateEmpty');
+  box.innerHTML = '';
+  if(templates.length === 0){
+    emptyBox.style.display = 'block';
+    emptyBox.textContent = t().noTemplates;
+    return;
+  }
+  emptyBox.style.display = 'none';
+  templates.forEach(tpl=>{
+    const chip = document.createElement('div');
+    chip.className = 'suggest-chip';
+    chip.innerHTML = `<span>📋 ${escapeHtml(tpl.name)}</span> <span data-del-tpl="${tpl.id}" style="opacity:.6;margin-inline-start:4px;">✕</span>`;
+    chip.addEventListener('click', async (e)=>{
+      if(e.target.hasAttribute('data-del-tpl')){
+        if(confirm(t().templateDeleteConfirm(tpl.name))){
+          templates = templates.filter(x=>x.id!==tpl.id);
+          await saveState(); renderTemplates();
+        }
+        return;
+      }
+      if(!confirm(t().templateApplyConfirm(tpl.name))) return;
+      tasks = tasks.filter(x=>x.day!==selectedDay);
+      tpl.items.forEach(item=>{
+        tasks.push({
+          id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+          seq: seqCounter++,
+          title: item.title, duration: item.duration, fixedTime: item.fixedTime,
+          day: selectedDay, overflow:false, done:false, category: item.category
+        });
+      });
+      await saveState();
+      activeTab = selectedDay;
+      render();
+    });
+    box.appendChild(chip);
+  });
+}
+
+async function saveCurrentDayAsTemplate(){
+  const dayTasks = tasks.filter(x=>x.day===activeTab);
+  if(dayTasks.length === 0){ alert(t().templateEmptyDay); return; }
+  const name = prompt(t().templatePromptName);
+  if(!name || !name.trim()) return;
+  templates.push({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    name: name.trim(),
+    items: dayTasks.map(x=>({title:x.title, duration:x.duration, fixedTime:x.fixedTime, category:x.category}))
+  });
+  await saveState();
+  renderTemplates();
+}
+
+function renderDurationChips(){
+  const box = document.getElementById('durationChips');
+  box.innerHTML = '';
+  DURATIONS.forEach(v=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (v===selectedDuration ? ' selected' : '');
+    chip.textContent = t().durLabels[v];
+    chip.addEventListener('click', ()=>{
+      selectedDuration = v;
+      document.getElementById('durationHoursInput').value = Math.floor(v/60);
+      document.getElementById('durationMinInput').value = v%60;
+      renderDurationChips();
+    });
+    box.appendChild(chip);
+  });
+}
+
+function renderCatChipsInForm(){
+  const box = document.getElementById('catChips');
+  box.innerHTML = '';
+  CAT_IDS.forEach(id=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip cat-chip' + (id===selectedCategory ? ' selected' : '');
+    chip.innerHTML = `<span class="cat-dot" style="background:${CAT_COLORS[id]}"></span>${t().categories[id]}`;
+    chip.addEventListener('click', ()=>{ selectedCategory = id; renderCatChipsInForm(); });
+    box.appendChild(chip);
+  });
+}
+
+function renderDayChipsInForm(){
+  const box = document.getElementById('dayChips');
+  box.innerHTML = '';
+  for(let d=0; d<settings.numDays; d++){
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (d===selectedDay ? ' selected' : '');
+    chip.textContent = settings.numDays===1 ? t().todayChip : t().dayChip(d+1);
+    chip.addEventListener('click', ()=>{ selectedDay = d; renderDayChipsInForm(); });
+    box.appendChild(chip);
+  }
+}
+
+function renderDayTabs(){
+  const box = document.getElementById('dayTabs');
+  box.innerHTML = '';
+  if(activeTab >= settings.numDays) activeTab = settings.numDays-1;
+  for(let d=0; d<settings.numDays; d++){
+    const tab = document.createElement('div');
+    tab.className = 'day-tab' + (d===activeTab ? ' active' : '');
+    tab.textContent = settings.numDays===1 ? t().todayChip : t().dayChip(d+1);
+    tab.addEventListener('click', ()=>{ activeTab = d; render(); });
+    box.appendChild(tab);
+  }
+  const dayName = settings.numDays===1 ? t().todayChip : t().dayChip(activeTab+1);
+  document.getElementById('railTitle').textContent =
+    t().railTitle(dayName, minutesToTimeLabel(settings.dayStart), minutesToTimeLabel(settings.dayEnd));
+}
+
+function renderRail(){
+  const grid = document.getElementById('railGrid');
+  grid.innerHTML = '';
+  const totalRows = Math.max(1, (settings.dayEnd - settings.dayStart)/15);
+  grid.style.gridTemplateRows = `repeat(${totalRows}, var(--row-h))`;
+
+  const startHour = Math.floor(settings.dayStart/60);
+  const endHour = Math.ceil(settings.dayEnd/60);
+  for(let h=startHour; h<endHour; h++){
+    const label = document.createElement('div');
+    label.className = 'hour-label';
+    label.textContent = h.toString().padStart(2,'0') + ':00';
+    const rowStart = ((h*60) - settings.dayStart)/15 + 1;
+    if(rowStart >= 1){ label.style.gridRow = `${rowStart} / span 4`; grid.appendChild(label); }
+  }
+
+  const dayTasks = tasks.filter(x=>x.day===activeTab);
+  dayTasks.forEach(x=>{
+    const block = document.createElement('div');
+    block.className = 'task-block' + (x.done?' done':'') + (x.overflow?' overflow':'');
+    const startRow = Math.max(1, Math.round((x.start - settings.dayStart)/15) + 1);
+    const span = Math.max(1, Math.round(x.duration/15));
+    block.style.gridRow = `${startRow} / span ${span}`;
+    block.style.background = CAT_COLORS[x.category] || CAT_COLORS.other;
+    block.textContent = x.title;
+    grid.appendChild(block);
+  });
+
+  const existingLine = document.querySelector('.now-line');
+  if(existingLine) existingLine.remove();
+  updateNowLine();
+}
+
+function updateNowLine(){
+  const existingLine = document.querySelector('.now-line');
+  if(existingLine) existingLine.remove();
+  const nowMins = new Date().getHours()*60 + new Date().getMinutes();
+  if(activeTab===0 && nowMins >= settings.dayStart && nowMins <= settings.dayEnd){
+    const nowLine = document.createElement('div');
+    nowLine.className = 'now-line';
+    nowLine.setAttribute('data-label', t().now);
+    nowLine.style.top = (((nowMins - settings.dayStart)/15) * 13) + 'px';
+    document.querySelector('.rail-outer').appendChild(nowLine);
+  }
+}
+
+function renderLegend(){
+  const box = document.getElementById('legend');
+  box.innerHTML = '';
+  CAT_IDS.forEach(id=>{
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${CAT_COLORS[id]}"></span>${t().categories[id]}`;
+    box.appendChild(item);
+  });
+}
+
+function renderList(){
+  const list = document.getElementById('taskList');
+  list.innerHTML = '';
+  const dayTasks = tasks.filter(x=>x.day===activeTab).sort((a,b)=>a.start-b.start);
+  if(dayTasks.length === 0){
+    list.innerHTML = `<div class="empty"><span class="empty-emoji">🗓️</span>${t().emptyDay}</div>`;
+    return;
+  }
+  dayTasks.forEach(x=>{
+    const item = document.createElement('div');
+    item.className = 'task-item';
+    item.innerHTML = `
+      <div class="check ${x.done?'done':''}" data-id="${x.id}">${x.done?'✓':''}</div>
+      <div class="task-dot" style="background:${CAT_COLORS[x.category]}"></div>
+      <div class="info">
+        <div class="title ${x.done?'done':''}">${escapeHtml(x.title)}</div>
+        <div class="meta ${x.overflow?'overflow':''}">${minutesToTimeLabel(x.start)} · ${x.duration} ${t().minutesWord} · ${t().categories[x.category]}${x.overflow?t().overflowNote:''}</div>
+      </div>
+      <button data-del="${x.id}">✕</button>
+    `;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('.check').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      const task = tasks.find(y=>y.id===el.getAttribute('data-id'));
+      if(task){
+        task.done = !task.done;
+        if(task.day === 0){
+          if(task.done){ completions[task.id] = { date: todayStr(), category: task.category }; }
+          else{ delete completions[task.id]; }
+        }
+        await saveState(); render();
+      }
+    });
+  });
+  list.querySelectorAll('[data-del]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      tasks = tasks.filter(y=>y.id!==el.getAttribute('data-del'));
+      await saveState(); render();
+    });
+  });
+}
+
+function renderSuggestions(){
+  const box = document.getElementById('suggestChips');
+  box.innerHTML = '';
+  const shuffled = [...SUGGESTION_IDS].sort(()=>Math.random()-0.5).slice(0,3);
+  shuffled.forEach(id=>{
+    const meta = SUGGESTION_META[id];
+    const chip = document.createElement('div');
+    chip.className = 'suggest-chip';
+    chip.innerHTML = `<span class="plus">+</span> ${escapeHtml(t().suggestions[id])}`;
+    chip.addEventListener('click', async ()=>{
+      tasks.push({
+        id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        seq: seqCounter++,
+        title: t().suggestions[id],
+        duration: meta.d>0 ? meta.d : 15,
+        fixedTime: meta.fixed ? settings.bedtime : null,
+        day: activeTab, overflow:false, done:false, category: meta.cat
+      });
+      await saveState(); render();
+    });
+    box.appendChild(chip);
+  });
+}
+
+function escapeHtml(str){ const div=document.createElement('div'); div.textContent=str; return div.innerHTML; }
+
+// ---- Events ----
+document.getElementById('fixedTimeToggle').addEventListener('change', e=>{
+  document.getElementById('fixedTimeField').style.display = e.target.checked ? 'block' : 'none';
+});
+
+function syncDurationFromFields(){
+  const h = Math.max(0, Number(document.getElementById('durationHoursInput').value)||0);
+  const m = Math.max(0, Number(document.getElementById('durationMinInput').value)||0);
+  selectedDuration = h*60+m;
+  document.querySelectorAll('#durationChips .chip').forEach(c=>c.classList.remove('selected'));
+}
+document.getElementById('durationHoursInput').addEventListener('input', syncDurationFromFields);
+document.getElementById('durationMinInput').addEventListener('input', syncDurationFromFields);
+
+document.getElementById('addBtn').addEventListener('click', async ()=>{
+  const titleInput = document.getElementById('titleInput');
+  const title = titleInput.value.trim();
+  if(!title){ titleInput.focus(); return; }
+  const h = Math.max(0, Number(document.getElementById('durationHoursInput').value)||0);
+  const m = Math.max(0, Number(document.getElementById('durationMinInput').value)||0);
+  const duration = (h*60+m) > 0 ? (h*60+m) : 30;
+  const useFixed = document.getElementById('fixedTimeToggle').checked;
+  const fixedTimeInput = document.getElementById('fixedTimeInput');
+  let fixedTime = null;
+  if(useFixed && fixedTimeInput.value){ fixedTime = timeToMinutes(fixedTimeInput.value); }
+
+  tasks.push({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    seq: seqCounter++,
+    title, duration, fixedTime,
+    day: selectedDay, overflow:false, done:false, category: selectedCategory
+  });
+  await saveState();
+  titleInput.value = '';
+  document.getElementById('fixedTimeToggle').checked = false;
+  document.getElementById('fixedTimeField').style.display = 'none';
+  fixedTimeInput.value = '';
+  activeTab = selectedDay;
+  render();
+});
+
+document.getElementById('refreshSuggestBtn').addEventListener('click', renderSuggestions);
+document.getElementById('saveTemplateBtn').addEventListener('click', saveCurrentDayAsTemplate);
+
+document.getElementById('shareBtn').addEventListener('click', async ()=>{
+  const url = window.location.href.split('#')[0];
+  const btn = document.getElementById('shareBtn');
+  const original = t().shareBtn;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(url);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    btn.textContent = t().shareCopied;
+    setTimeout(()=>{ btn.textContent = original; }, 1500);
+  }catch(e){
+    btn.textContent = url;
+  }
+});
+
+document.getElementById('aboutBtn').addEventListener('click', ()=>{
+  document.getElementById('aboutOverlay').style.display = 'flex';
+});
+document.getElementById('aboutClose').addEventListener('click', ()=>{
+  document.getElementById('aboutOverlay').style.display = 'none';
+});
+document.getElementById('aboutOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'aboutOverlay') document.getElementById('aboutOverlay').style.display = 'none';
+});
+
+document.getElementById('themeToggle').addEventListener('click', async ()=>{
+  settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', settings.theme);
+  document.getElementById('themeToggle').textContent = settings.theme === 'dark' ? '🌙' : '☀️';
+  await saveState();
+});
+
+document.getElementById('summaryBtn').addEventListener('click', ()=>{
+  renderSummaryContent();
+  document.getElementById('summaryOverlay').style.display = 'flex';
+});
+document.getElementById('summaryClose').addEventListener('click', ()=>{
+  document.getElementById('summaryOverlay').style.display = 'none';
+});
+document.getElementById('summaryOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'summaryOverlay') document.getElementById('summaryOverlay').style.display = 'none';
+});
+
+// ---- Notifications (foreground-only; see about note) ----
+function updateNotifyBtn(){
+  const btn = document.getElementById('notifyBtn');
+  if(typeof Notification === 'undefined'){ btn.style.display = 'none'; return; }
+  if(Notification.permission === 'denied'){ btn.textContent = t().notifyDenied; return; }
+  btn.textContent = (settings.notifyEnabled ? t().notifyBtnOn : t().notifyBtnOff) + ' ' + t().notifyLimitNote;
+}
+document.getElementById('notifyBtn').addEventListener('click', async ()=>{
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission === 'denied'){ return; }
+  if(Notification.permission !== 'granted'){
+    const perm = await Notification.requestPermission();
+    settings.notifyEnabled = perm === 'granted';
+  } else {
+    settings.notifyEnabled = !settings.notifyEnabled;
+  }
+  await saveState();
+  updateNotifyBtn();
+});
+function checkReminders(){
+  if(!settings.notifyEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const nowMins = new Date().getHours()*60 + new Date().getMinutes();
+  tasks.filter(x=>x.day===0 && x.fixedTime!=null && !x.done && !x.notified).forEach(x=>{
+    const diff = x.fixedTime - nowMins;
+    if(diff >= 0 && diff <= 5){
+      try{ new Notification('Manage It', { body: x.title, icon: 'icon-192.png' }); }catch(e){}
+      x.notified = true;
+      saveState();
+    }
+  });
+}
+
+// ---- Onboarding ----
+let onboardIndex = 0;
+function renderOnboardStep(){
+  const steps = t().onboardSteps;
+  const s = steps[onboardIndex];
+  document.getElementById('onboardEmoji').textContent = s.emoji;
+  document.getElementById('onboardTitle').textContent = s.title;
+  document.getElementById('onboardBody').textContent = s.body;
+  document.getElementById('onboardSkip').textContent = t().onboardSkip;
+  document.getElementById('onboardNext').textContent = onboardIndex === steps.length-1 ? t().onboardStart : t().onboardNext;
+  const dots = document.getElementById('onboardDots');
+  dots.innerHTML = '';
+  steps.forEach((_,i)=>{
+    const d = document.createElement('div');
+    d.className = 'onboard-dot' + (i===onboardIndex ? ' active' : '');
+    dots.appendChild(d);
+  });
+}
+function closeOnboarding(){
+  document.getElementById('onboardOverlay').style.display = 'none';
+  localStorage.setItem('manageit-onboarded', '1');
+}
+document.getElementById('onboardNext').addEventListener('click', ()=>{
+  const steps = t().onboardSteps;
+  if(onboardIndex === steps.length-1){ closeOnboarding(); }
+  else{ onboardIndex++; renderOnboardStep(); }
+});
+document.getElementById('onboardSkip').addEventListener('click', closeOnboarding);
+
+document.getElementById('dayStartInput').addEventListener('change', async e=>{ settings.dayStart = timeToMinutes(e.target.value); await saveState(); render(); });
+document.getElementById('dayEndInput').addEventListener('change', async e=>{ settings.dayEnd = timeToMinutes(e.target.value); await saveState(); render(); });
+document.getElementById('bedtimeInput').addEventListener('change', async e=>{ settings.bedtime = timeToMinutes(e.target.value); await saveState(); });
+document.getElementById('numDaysInput').addEventListener('change', async e=>{
+  let n = Math.max(1, Math.min(7, Number(e.target.value)||1));
+  settings.numDays = n; e.target.value = n;
+  if(selectedDay >= n) selectedDay = n-1;
+  await saveState(); render();
+});
+
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(confirm(t().resetConfirm)){
+    tasks = []; seqCounter = 0; activeTab = 0; selectedDay = 0;
+    await saveState(); render();
+  }
+});
+
+document.getElementById('langSelect').addEventListener('change', async (e)=>{
+  settings.lang = e.target.value;
+  await saveState();
+  render();
+  renderSuggestions();
+});
+
+// ---- Init ----
+(async ()=>{
+  await loadState();
+  document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
+  document.getElementById('themeToggle').textContent = settings.theme === 'light' ? '☀️' : '🌙';
+  document.getElementById('dayStartInput').value = minutesToTimeLabel(settings.dayStart);
+  document.getElementById('dayEndInput').value = minutesToTimeLabel(settings.dayEnd);
+  document.getElementById('bedtimeInput').value = minutesToTimeLabel(settings.bedtime);
+  document.getElementById('numDaysInput').value = settings.numDays;
+  document.getElementById('durationHoursInput').value = Math.floor(selectedDuration/60);
+  document.getElementById('durationMinInput').value = selectedDuration%60;
+  renderSuggestions();
+  render();
+  updateNotifyBtn();
+  setInterval(updateNowLine, 60000);
+  setInterval(checkReminders, 30000);
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  }
+
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.style.opacity = '0';
+  setTimeout(()=>{ overlay.style.display = 'none'; }, 300);
+
+  if(!localStorage.getItem('manageit-onboarded')){
+    onboardIndex = 0;
+    renderOnboardStep();
+    document.getElementById('onboardOverlay').style.display = 'flex';
+  }
+})();
+</script>
+</body>
+</html>
